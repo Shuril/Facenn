@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environment
+.env
+.venv
+venv/
+ENV/
+env/
+/bin
+/include
+/lib
+
+# Model Weights (excluded from git due to size limits)
+weights/
+
+# Facenn
+.facenn/
+*.db
+tests/test.db
+tests/*.jpg
+benchmark_output.txt
+
+# Editor
+.idea/
+.vscode/
+*.swp
