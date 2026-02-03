@@ -17,7 +17,15 @@
 
 ## 📦 Installation
 
+### Quick Start (GitHub)
 ```bash
+pip install git+https://github.com/Shuril/Facenn.git
+```
+
+### For Development
+```bash
+git clone https://github.com/Shuril/Facenn.git
+cd Facenn
 pip install -r requirements.txt
 ```
 
