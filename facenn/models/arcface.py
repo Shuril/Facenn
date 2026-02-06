@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 from facenn.models.base import FaceRecognitionModel
-from facenn.config import Config, DEVICE
+from facenn.config import Config, DEVICE, logger
 
 from facenn.models.backbones.irse import IR_SE_50
 from facenn.utils.io import download_file_from_url
@@ -33,9 +33,9 @@ class ArcFace(FaceRecognitionModel):
                      
                  self.model.load_state_dict(state_dict)
              else:
-                 print(f"Warning: Failed to download weights to {weights_path}")
+                 logger.warning(f"Failed to download weights to {weights_path}")
         except Exception as e:
-             print(f"Error loading ArcFace weights: {e}")
+             logger.error(f"Error loading ArcFace weights: {e}")
              
         self.model.to(DEVICE)
         self.model.eval()

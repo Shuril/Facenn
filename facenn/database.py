@@ -11,6 +11,7 @@ class FaceDB:
         self.db_path = db_path
         self.embeddings = [] # List of tensors or numpy arrays
         self.identities = [] # List of strings/metadata
+        self._cache = {} # Cache for stacked tensors by dimension
         self.load()
 
     def load(self):
@@ -37,6 +38,7 @@ class FaceDB:
             
         self.embeddings.append(embedding)
         self.identities.append(identity)
+        self._cache = {} # Invalidate cache
 
     def search(self, embedding, k=1, metric="cosine", threshold=0.4):
         """
@@ -46,15 +48,32 @@ class FaceDB:
         if not self.embeddings:
             return pd.DataFrame(columns=['identity', 'distance'])
 
-        # Convert DB to tensor on DEVICE for fast search
-        # check if embeddings list is not empty and consists of numpy arrays
-        # Stack them into a tensor
-        db_tensor = torch.tensor(np.array(self.embeddings)).float().to(DEVICE)
-        
         if isinstance(embedding, torch.Tensor):
             query_tensor = embedding.to(DEVICE)
         else:
             query_tensor = torch.tensor(np.array(embedding)).float().to(DEVICE)
+
+        # Convert DB to tensor on DEVICE for fast search
+        # Only use embeddings with the same shape as query to avoid errors
+        query_dim = query_tensor.shape[-1]
+
+        if query_dim in self._cache:
+            db_tensor, valid_indices = self._cache[query_dim]
+        else:
+            valid_indices = []
+            valid_embs = []
+
+            for i, e in enumerate(self.embeddings):
+                e_np = np.array(e)
+                if e_np.shape[-1] == query_dim:
+                    valid_indices.append(i)
+                    valid_embs.append(e_np.flatten())
+
+            if not valid_embs:
+                return pd.DataFrame(columns=['identity', 'distance'])
+
+            db_tensor = torch.tensor(np.array(valid_embs)).float().to(DEVICE)
+            self._cache[query_dim] = (db_tensor, valid_indices)
         
         if len(query_tensor.shape) == 1:
             query_tensor = query_tensor.unsqueeze(0)
@@ -78,7 +97,7 @@ class FaceDB:
         results = []
         for idx in indices:
             results.append({
-                'identity': self.identities[idx],
+                'identity': self.identities[valid_indices[idx]],
                 'distance': distances[idx]
             })
             

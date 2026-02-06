@@ -34,21 +34,18 @@ def verify_all():
     # 3. Detection
     print("\n[2] Testing Face Detection...")
     try:
-        faces = app.extract_faces(img1)
+        faces = app.detector.detect_faces(cv2.imread(img1))
         if len(faces) > 0:
             print(f"    Success. Found {len(faces)} faces.")
         else:
-            print("    Warning: No faces found in dummy image (expected for dummy).")
-            # For verification to proceed, we might need to mock or ensure detection works
-            # But let's proceed to analysis which might handle empty faces gracefully or fail
+            print("    Warning: No faces found in dummy image.")
     except Exception as e:
         print(f"    Failed: {e}")
 
     # 4. Verification
     print("\n[3] Testing Verification (ArcFace)...")
     try:
-        # If detection fails on dummy, verify might fail if enforce_detection=True
-        res = app.verify(img1, img2, enforce_detection=False)
+        res = app.verify(img1, img2)
         print(f"    Success. Result: Verified={res['verified']}, Distance={res['distance']:.4f}")
     except Exception as e:
         print(f"    Failed: {e}")
@@ -57,14 +54,10 @@ def verify_all():
     print("\n[4] Testing Analysis (PyTorch - CPU/MPS)...")
     app.analyzer_backend = 'torch'
     try:
-        # Use enforce_detection=False for dummy test
-        app.detector_backend = 'skip' # Skip detection to feed full image or mock
-        # Actually Facenn.analyze expects detection. 
-        # Let's trust our previous verify_analysis.py which mocked detection effectively.
-        # Here we will try to run it 'raw' if possible or rely on the fact verify worked.
-        # Ideally, we should monkey patch detector for dummy images.
-        from facenn.models.detectors.base import BaseDetector
-        class MockDetector(BaseDetector):
+        # Mock detector for dummy images
+        from facenn.detectors.base import FaceDetector
+        class MockDetector(FaceDetector):
+            def __init__(self): super().__init__("Mock")
             def detect_faces(self, img):
                 return [{'box': [50, 50, 200, 200], 'confidence': 0.99, 'keypoints': {}}]
         app.detector = MockDetector()

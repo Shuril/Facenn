@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import torch
-from facenn.config import DEVICE
+from facenn.config import DEVICE, logger
 from facenn.database import FaceDB
 from facenn.detectors.retinaface import RetinaFaceWrapper, OpenCVFaceDetector
 from facenn.detectors.yunet import YuNetWrapper
@@ -101,28 +101,46 @@ class Facenn:
         
         # Detect
         faces = self.detector.detect_faces(img)
-        embeddings = []
+        if not faces:
+            return []
+
+        target_size = self.recognition_model.input_shape
+        face_tensors = []
         
         for face in faces:
-            x, y, w, h = face['box']
-            face_img = img[y:y+h, x:x+w]
+            # Align face if keypoints are available
+            if face.get('keypoints'):
+                face_img = align_face(img, face['keypoints'], target_size=target_size)
+            else:
+                x, y, w, h = face['box']
+                # Clip coordinates to image boundaries
+                ih, iw = img.shape[:2]
+                x1, y1 = max(0, x), max(0, y)
+                x2, y2 = min(iw, x+w), min(ih, y+h)
+                face_img = img[y1:y2, x1:x2]
+                if face_img.size == 0: continue
+                face_img = cv2.resize(face_img, target_size)
             
-            # Preprocess (resize, normalize)
-            # Use model specific input shape
-            target_size = self.recognition_model.input_shape
-            face_img = cv2.resize(face_img, target_size)
+            # Preprocess
             face_img = np.transpose(face_img, (2, 0, 1)) # HWC to CHW
-            face_img = torch.tensor(face_img).float()
-            face_img = (face_img - 127.5) / 128.0 # Normalize -1 to 1
-            face_img = face_img.unsqueeze(0).to(DEVICE)
+            face_tensor = torch.tensor(face_img).float()
+            face_tensor = (face_tensor - 127.5) / 128.0 # Normalize -1 to 1
+            face_tensors.append(face_tensor)
             
-            # Embed
-            with torch.no_grad():
-                embedding = self.recognition_model.predict(face_img)
+        if not face_tensors:
+            return []
             
-            embeddings.append(embedding)
+        # Batch processing for efficiency
+        batch_tensor = torch.stack(face_tensors).to(DEVICE)
+
+        with torch.no_grad():
+            embeddings = self.recognition_model.predict(batch_tensor)
             
-        return embeddings
+        # Return as list of individual embeddings
+        if len(embeddings.shape) == 1: # Single face case if model returns (D,)
+            return [embeddings]
+
+        return [embeddings[i] for i in range(embeddings.size(0))]
         
     def add_to_db(self, img_path, identity):
         """
@@ -135,7 +153,7 @@ class Facenn:
                  self.db.save()
                  return True
         except Exception as e:
-             print(f"Error adding {identity}: {e}")
+             logger.error(f"Error adding {identity}: {e}")
         return False
 
     def analyze(self, img_path, actions=['age', 'gender', 'race', 'emotion']):

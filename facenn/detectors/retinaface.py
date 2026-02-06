@@ -1,13 +1,11 @@
 import cv2
 import numpy as np
-from facenn.detectors.base import FaceDetector
-
-from facenn.models.retinaface import RetinaFace
-from facenn.config import Config, DEVICE
-from facenn.utils.io import download_file_from_url
+import os
 import torch
-import numpy as np
-import cv2
+from facenn.detectors.base import FaceDetector
+from facenn.models.retinaface import RetinaFace
+from facenn.config import Config, DEVICE, logger
+from facenn.utils.io import download_file_from_url
 
 class RetinaFaceWrapper(FaceDetector):
     def __init__(self):
@@ -36,9 +34,9 @@ class RetinaFaceWrapper(FaceDetector):
                      self.net.load_state_dict(checkpoint)
                  self.net.eval()
              else:
-                 print("Warning: Failed to download RetinaFace weights.")
+                 logger.warning("Failed to download RetinaFace weights.")
         except Exception as e:
-             print(f"Error loading RetinaFace weights: {e}")
+             logger.error(f"Error loading RetinaFace weights: {e}")
 
     def detect_faces(self, img_raw: np.ndarray):
         # Basic preprocessing and inference loop for RetinaFace

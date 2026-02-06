@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import torch.nn as nn
-from facenn.config import DEVICE
+from facenn.config import DEVICE, logger, Config
+import torch
 
 class FaceRecognitionModel(ABC):
     def __init__(self, model_name: str, input_shape: tuple):
@@ -85,7 +86,7 @@ class FaceRecognitionModel(ABC):
         if os.path.exists(weights_path):
             return weights_path
             
-        print(f"ONNX model for {self.model_name} not found. Exporting...")
+        logger.info(f"ONNX model for {self.model_name} not found. Exporting...")
         
         # Ensure model is loaded
         if self.model is None:

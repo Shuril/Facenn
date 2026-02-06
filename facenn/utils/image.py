@@ -43,38 +43,72 @@ def load_base64_img(uri):
     nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
     return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-def align_face(img, left_eye, right_eye):
+def align_face(img, keypoints, target_size=(112, 112)):
     """
-    Aligns the face based on eye coordinates.
+    Aligns the face based on 5 keypoints (left eye, right eye, nose, left mouth, right mouth).
+    Uses Similarity Transformation.
     """
-    # Simple alignment logic implementation placeholder
-    # In a full implementation, this uses affine transformations
-    left_eye_x, left_eye_y = left_eye
-    right_eye_x, right_eye_y = right_eye
+    if not keypoints or len(keypoints) < 2:
+        return cv2.resize(img, target_size)
+
+    # Standard reference points for 112x112 image
+    # Note: These are for 112x112. We scale them if target_size is different.
+    ref_pts = np.array([
+        [38.2946, 51.6963], # left eye
+        [73.5318, 51.5014], # right eye
+        [56.0252, 71.7366], # nose
+        [41.5493, 92.3655], # left mouth
+        [70.7299, 92.2041]  # right mouth
+    ], dtype=np.float32)
+
+    if target_size != (112, 112):
+        ref_pts[:, 0] = ref_pts[:, 0] * target_size[0] / 112
+        ref_pts[:, 1] = ref_pts[:, 1] * target_size[1] / 112
+
+    # Map our keypoints to the ref points
+    # Reference points order: left_eye, right_eye, nose, left_mouth, right_mouth
+    ref_map = {
+        'left_eye': [38.2946, 51.6963],
+        'right_eye': [73.5318, 51.5014],
+        'nose': [56.0252, 71.7366],
+        'mouth_left': [41.5493, 92.3655],
+        'mouth_right': [70.7299, 92.2041]
+    }
     
-    if left_eye_y > right_eye_y:
-        point_3rd = (right_eye_x, left_eye_y)
-        direction = -1 # inverse clocwise
-    else:
-        point_3rd = (left_eye_x, right_eye_y)
-        direction = 1 # clockwise
-        
-    a = find_euclidean_distance_cpu(np.array(left_eye), np.array(point_3rd))
-    b = find_euclidean_distance_cpu(np.array(right_eye), np.array(point_3rd))
-    c = find_euclidean_distance_cpu(np.array(right_eye), np.array(left_eye))
+    src_pts = []
+    dst_pts = []
+    for name, ref_pt in ref_map.items():
+        if name in keypoints:
+            src_pts.append(keypoints[name])
+            # Scale reference point if needed
+            scaled_ref = [
+                ref_pt[0] * target_size[0] / 112,
+                ref_pt[1] * target_size[1] / 112
+            ]
+            dst_pts.append(scaled_ref)
+
+    if len(src_pts) < 3:
+        # Fallback for 2 points (eyes)
+        if 'left_eye' in keypoints and 'right_eye' in keypoints:
+             # Basic eye-based alignment could be added here,
+             # but estimateAffinePartial2D needs at least 2 points.
+             # Actually opencv says 2 points are enough for estimateAffinePartial2D
+             pass
+        else:
+             return cv2.resize(img, target_size)
+
+    src_pts = np.array(src_pts, dtype=np.float32)
+    dst_pts = np.array(dst_pts, dtype=np.float32)
     
-    if b != 0 and c != 0:
-        cos_a = (b*b + c*c - a*a)/(2*b*c)
-        angle = np.arccos(cos_a)
-        angle = (angle * 180) / np.pi
-        
-        if direction == -1:
-            angle = 90 - angle
-        
-        img = Image.fromarray(img)
-        img = np.array(img.rotate(direction * angle))
-        
-    return img
+    # If we have at least 2 points, we can do similarity transform
+    if len(src_pts) >= 2:
+        tform = cv2.estimateAffinePartial2D(src_pts, dst_pts)[0]
+        if tform is not None:
+            aligned_img = cv2.warpAffine(img, tform, target_size, borderValue=0)
+            return aligned_img
+
+    # Fallback to simple crop if transform fails or not enough points
+    return cv2.resize(img, target_size)
 
 # Avoid circular import by defining simple distance for alignment here or importing carefully
 def find_euclidean_distance_cpu(a, b):

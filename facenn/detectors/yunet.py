@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 from facenn.detectors.base import FaceDetector
-from facenn.config import Config
+from facenn.config import Config, logger
 from facenn.utils.io import download_file_from_url
 
 class YuNetWrapper(FaceDetector):
@@ -16,8 +16,8 @@ class YuNetWrapper(FaceDetector):
 
     def load_model(self):
         # YuNet weights file
-        # Source: https://github.com/opencv/opencv_zoo/tree/master/models/face_detection_yunet
-        url = "https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
+        # Source: https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet
+        url = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
         
         weights_path = Config.get_weights_path("YuNet", "face_detection_yunet_2023mar.onnx")
         
@@ -35,9 +35,9 @@ class YuNetWrapper(FaceDetector):
                      target_id=cv2.dnn.DNN_TARGET_CPU # OpenCV DNN usually runs best on CPU/OpenCL
                  )
              else:
-                 print("Warning: Failed to download YuNet weights.")
+                 logger.warning("Failed to download YuNet weights.")
         except Exception as e:
-             print(f"Error loading YuNet weights: {e}")
+             logger.error(f"Error loading YuNet weights: {e}")
 
     def detect_faces(self, img: np.ndarray):
         if self.net is None: 
@@ -58,13 +58,22 @@ class YuNetWrapper(FaceDetector):
         output = []
         if results is not None:
             for face in results:
-                # Format: [x, y, w, h, x_re, y_re, x_le, y_le, ..., conf]
+                # Format: [x, y, w, h, x_re, y_re, x_le, y_le, x_nt, y_nt, x_rm, y_rm, x_lm, y_lm, conf]
                 box = face[0:4].astype(int)
                 conf = face[-1]
                 
+                # Landmarks (5 points)
+                landmarks = face[4:14].reshape(5, 2).astype(int)
+
                 output.append({
                     'box': box.tolist(),
                     'confidence': float(conf),
-                    'keypoints': {} # Extract landmarks if needed
+                    'keypoints': {
+                        'right_eye': landmarks[0].tolist(),
+                        'left_eye': landmarks[1].tolist(),
+                        'nose': landmarks[2].tolist(),
+                        'mouth_right': landmarks[3].tolist(),
+                        'mouth_left': landmarks[4].tolist()
+                    }
                 })
         return output

@@ -1,7 +1,7 @@
 import torch
 import os
 import onnx
-from facenn.config import DEVICE, Config
+from facenn.config import DEVICE, Config, logger
 
 def export_to_onnx(model, output_path, input_shape=(1, 3, 112, 112), opset_version=12):
     """
@@ -24,13 +24,13 @@ def export_to_onnx(model, output_path, input_shape=(1, 3, 112, 112), opset_versi
             output_names=['output'],
             dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
         )
-        print(f"Successfully exported model to {output_path}")
+        logger.info(f"Successfully exported model to {output_path}")
         
         # Verify
         onnx_model = onnx.load(output_path)
         onnx.checker.check_model(onnx_model)
-        print("ONNX model verified.")
+        logger.info("ONNX model verified.")
         return True
     except Exception as e:
-        print(f"Export failed: {e}")
+        logger.error(f"Export failed: {e}")
         return False
