@@ -1,70 +1,99 @@
+from typing import Any, Dict, List, Optional
+import logging
+import os
 import cv2
 import numpy as np
-import os
-from facenn.detectors.base import FaceDetector
+
 from facenn.config import Config
+from facenn.detectors.base import FaceDetector
 from facenn.utils.io import download_file_from_url
 
+logger = logging.getLogger("facenn")
+
+YUNET_MODEL_URL = (
+    "https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/"
+    "face_detection_yunet_2023mar.onnx"
+)
+
+
 class YuNetWrapper(FaceDetector):
-    def __init__(self):
+    def __init__(
+        self,
+        conf_threshold: float = 0.7,
+        nms_threshold: float = 0.3,
+        top_k: int = 5000,
+        model_path: Optional[str] = None,
+    ):
         super().__init__("YuNet")
+        self.conf_threshold = conf_threshold
+        self.nms_threshold = nms_threshold
+        self.top_k = top_k
+        self.model_path = model_path
         self.net = None
-        self.conf_threshold = 0.9
-        self.nms_threshold = 0.3
-        self.top_k = 5000
-        self.load_model()
 
-    def load_model(self):
-        # YuNet weights file
-        # Source: https://github.com/opencv/opencv_zoo/tree/master/models/face_detection_yunet
-        url = "https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
-        
-        weights_path = Config.get_weights_path("YuNet", "face_detection_yunet_2023mar.onnx")
-        
-        try:
-             download_file_from_url(url, weights_path)
-             if os.path.exists(weights_path):
-                 self.net = cv2.FaceDetectorYN.create(
-                     model=weights_path,
-                     config="",
-                     input_size=(320, 320), # Will be updated dynamically
-                     score_threshold=self.conf_threshold,
-                     nms_threshold=self.nms_threshold,
-                     top_k=self.top_k,
-                     backend_id=cv2.dnn.DNN_BACKEND_DEFAULT,
-                     target_id=cv2.dnn.DNN_TARGET_CPU # OpenCV DNN usually runs best on CPU/OpenCL
-                 )
-             else:
-                 print("Warning: Failed to download YuNet weights.")
-        except Exception as e:
-             print(f"Error loading YuNet weights: {e}")
+    def _ensure_model(self):
+        if self.net is not None:
+            return
 
-    def detect_faces(self, img: np.ndarray):
-        if self.net is None: 
+        weights_path = self.model_path or Config.get_weights_path("YuNet", "face_detection_yunet_2023mar.onnx")
+        if not os.path.exists(weights_path):
+            download_file_from_url(YUNET_MODEL_URL, weights_path)
+
+        self.net = cv2.FaceDetectorYN.create(
+            model=weights_path,
+            config="",
+            input_size=(320, 320),
+            score_threshold=self.conf_threshold,
+            nms_threshold=self.nms_threshold,
+            top_k=self.top_k,
+            backend_id=cv2.dnn.DNN_BACKEND_DEFAULT,
+            target_id=cv2.dnn.DNN_TARGET_CPU,
+        )
+
+    def detect_faces(self, img: np.ndarray) -> List[Dict[str, Any]]:
+        self._ensure_model()
+        if self.net is None or img is None or img.size == 0:
             return []
-            
-        h, w, _ = img.shape
-        self.net.setInputSize((w, h))
-        
-        faces = self.net.detect(img)
-        # faces[1] is the result, [0] is a boolean? Check cv2 docs.
-        # detect returns (faces, landmarks) tuple in some versions or just faces
-        
-        # In recent OpenCV:
-        # faces = self.net.detect(img)
-        # faces is a tuple: (faces, valid_flag) or something similar?
-        results = faces[1] if faces[1] is not None else []
-        
-        output = []
-        if results is not None:
-            for face in results:
-                # Format: [x, y, w, h, x_re, y_re, x_le, y_le, ..., conf]
-                box = face[0:4].astype(int)
-                conf = face[-1]
-                
-                output.append({
-                    'box': box.tolist(),
-                    'confidence': float(conf),
-                    'keypoints': {} # Extract landmarks if needed
-                })
-        return output
+
+        h, w = img.shape[:2]
+        self.net.setInputSize((int(w), int(h)))
+
+        _, detections = self.net.detect(img)
+        if detections is None or len(detections) == 0:
+            return []
+
+        results: List[Dict[str, Any]] = []
+        for face in detections:
+            box = [int(v) for v in face[0:4]]
+            conf = float(face[-1])
+
+            # OpenCV YuNet landmarks layout:
+            # right eye (viewer left), left eye (viewer right), nose, right mouth, left mouth
+            landmarks = np.array(
+                [
+                    [face[4], face[5]],
+                    [face[6], face[7]],
+                    [face[8], face[9]],
+                    [face[10], face[11]],
+                    [face[12], face[13]],
+                ],
+                dtype=np.float32,
+            )
+
+            results.append(
+                {
+                    "box": box,
+                    "confidence": conf,
+                    "landmarks": landmarks,
+                    "keypoints": {
+                        "left_eye": (float(face[4]), float(face[5])),
+                        "right_eye": (float(face[6]), float(face[7])),
+                        "nose": (float(face[8]), float(face[9])),
+                        "mouth_left": (float(face[10]), float(face[11])),
+                        "mouth_right": (float(face[12]), float(face[13])),
+                    },
+                }
+            )
+
+        return results
+

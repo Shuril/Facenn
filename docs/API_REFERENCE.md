@@ -1,93 +1,123 @@
-# API Reference 📖
+# API Reference
 
-The primary interface for the library is the `Facenn` class located in `facenn.core`.
+The primary interface is the `Facenn` class located in `facenn`.
 
-## Facenn Class
+```python
+from facenn import Facenn, Config, FaceDB
+```
+
+## `Facenn` Class
 
 ### `__init__`
 Initializes the Facenn pipeline.
 
 **Arguments:**
-- `recognition_model_name` (str): Name of the model to use for face embeddings.
-    - Default: `'ArcFace'`.
-    - Options: `'ArcFace'`, `'FaceNet'`, `'MobileFaceNet'`, `'EdgeFace'`, `'VGG-Face'`, `'Buffalo_L'`.
-- `detector_backend` (str): Backend for face detection.
-    - Default: `'opencv'`.
-    - Options: `'opencv'`, `'retinaface'`, `'yunet'`, `'centerface'`, `'yolov12'`.
-- `analyzer_backend` (str): Backend for attribute analysis (Age, Gender, Race, Emotion).
-    - Default: `'onnx'`.
-    - Options: `'torch'`, `'onnx'`.
-- `recognition_backend` (str): Backend for recognition models.
-    - Default: `'torch'`.
-    - Options: `'torch'`, `'onnx'`.
+- `recognition_model_name` (str): Name of the face embedding model. Default: `'ArcFace'`. Options: `'ArcFace'`, `'FaceNet'`, `'MobileFaceNet'`, `'EdgeFace'`, `'Buffalo_L'`.
+- `detector_backend` (str): Detector backend. Default: `'yunet'`. Options: `'yunet'`, `'retinaface'`, `'opencv'` (`'haarcascade'`).
+- `analyzer_backend` (str): Backend for attribute analysis. Default: `'onnx'`. Options: `'onnx'`, `'torch'`.
+- `recognition_backend` (str): Backend for recognition models. Default: `'torch'`. Options: `'torch'`, `'onnx'`.
+- `db_path` (str, optional): Custom path for the SQLite database. Default: `~/.cache/facenn/identities.sqlite`.
 
 ---
 
-### `verify`
-Compares two images to determine if they belong to the same person.
+### `detect_faces`
+Detects bounding boxes and facial landmarks.
 
 **Arguments:**
-- `img1_path` (str|np.array): Path to the first image or a numpy array.
-- `img2_path` (str|np.array): Path to the second image or a numpy array.
-- `threshold` (float): Cosine distance threshold (lower is stricter). Default: `0.4`.
+- `img` (str | np.ndarray | PIL.Image | bytes): Input image.
 
 **Returns:**
-- `dict`: Contains `verified` (bool), `distance` (float), `threshold` (float), and `model` name.
+- `List[dict]`: Dictionaries with `box` `[x, y, w, h]`, `confidence` (float), `landmarks` `(5, 2) np.ndarray`, and `keypoints`.
+
+---
+
+### `extract_faces`
+Crops and aligns detected faces into standard chips.
+
+**Arguments:**
+- `img`: Input image.
+- `target_size` (tuple, optional): Target chip size `(width, height)`. Default: model input resolution.
+- `align` (bool): Whether to perform 5-point affine alignment. Default: `True`.
+
+**Returns:**
+- `List[np.ndarray]`: List of cropped/aligned BGR face chips.
 
 ---
 
 ### `represent`
-Extracts face embeddings from an image.
+Extracts L2-normalized face embedding vectors.
 
 **Arguments:**
-- `img_path` (str|np.array): Path to the image or a numpy array.
+- `img`: Input image.
+- `align` (bool): Whether to align faces before extraction. Default: `True`.
 
 **Returns:**
-- `list`: A list of 512-dim (or model-specific size) embeddings (tensors/arrays).
+- `List[np.ndarray]`: List of 1D float32 normalized embedding vectors.
+
+---
+
+### `verify`
+Compares two images to determine if they represent the same identity.
+
+**Arguments:**
+- `img1`: Path or image of the first face.
+- `img2`: Path or image of the second face.
+- `threshold` (float): Cosine distance threshold (default: `0.4`).
+- `enforce_detection` (bool): Whether to require face detection (default: `True`).
+- `align` (bool): Whether to align faces prior to comparison (default: `True`).
+
+**Returns:**
+- `dict`: `{"verified": bool, "distance": float, "similarity": float, "threshold": float, "model": str}`.
 
 ---
 
 ### `find`
-Searches for a face in the internal Vector Database.
+Searches the database for matching identities.
 
 **Arguments:**
-- `img_path` (str|np.array): Path to the query image.
-- `threshold` (float): Maximum cosine distance to consider a match. Default: `0.4`.
+- `img`: Query image containing a face.
+- `db_path` (str, optional): Alternative database path.
+- `k` (int): Number of top matches to retrieve (default: `5`).
+- `threshold` (float): Maximum cosine distance (default: `0.4`).
 
 **Returns:**
-- `list`: A list of matches, each containing `identity` and `distance`.
+- `pandas.DataFrame`: Matches with columns `['identity', 'distance', 'id']`.
 
 ---
 
 ### `add_to_db`
-Registers a face into the Vector Database.
+Registers a face into the database.
 
 **Arguments:**
-- `img_path` (str|np.array): Image containing the face.
-- `identity` (str): Name/ID for this person.
+- `img`: Image containing the face.
+- `identity` (str): Identity name or identifier.
 
 **Returns:**
-- `bool`: True if successful.
+- `bool`: `True` if successfully registered.
 
 ---
 
 ### `analyze`
-Extracts demographic and emotional attributes from faces.
+Extracts demographic and emotional attributes.
 
 **Arguments:**
-- `img_path` (str|np.array): Path to the image.
-- `actions` (list): List of attributes to extract.
-    - Options: `['age', 'gender', 'race', 'emotion']`.
+- `img`: Input image.
+- `actions` (tuple): Attributes to extract. Options: `'age'`, `'gender'`, `'race'`, `'emotion'`.
 
 **Returns:**
-- `list`: List of analysis results per face, including the bounding box (`region`).
+- `List[dict]`: Analysis results per face with region and requested attributes.
 
 ---
 
-## Configuration (Config Class)
+## `FaceDB` Class
 
-The `Config` class in `facenn.config` allows global settings:
+SQLite-backed vector database with in-memory normalized matrix indexing.
 
-- `FACENN_HOME`: Root directory for model weights. Controlled by `FACENN_HOME` environment variable.
-- `USE_OPENVINO`: Boolean flag to enable OpenVINO optimization. Managed via `FACENN_USE_OPENVINO` env var.
-- `DEVICE`: The auto-detected hardware device (`cuda`, `mps`, `vulkan`, `cpu`).
+```python
+db = FaceDB(db_path="faces.sqlite")
+db.add_face(embedding, identity="Alice")
+results = db.search(query_embedding, k=5, threshold=0.4)
+db.delete(identity="Alice")
+db.clear()
+```
+

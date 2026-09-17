@@ -13,30 +13,18 @@ class ArcFace(FaceRecognitionModel):
         
     def load_model(self):
         self.model = IR_SE_50(self.input_shape)
-        
-        # Weights from a public repo compatible with this architecture
-        # Source: HuggingFace (AIRI-Institute)
         url = "https://huggingface.co/AIRI-Institute/StyleFeatureEditor/resolve/main/pretrained_models/model_ir_se50.pth"
-        
         weights_path = Config.get_weights_path("ArcFace", "model_ir_se50.pth")
-        
+
+        if not os.path.exists(weights_path):
+            download_file_from_url(url, weights_path)
+
         try:
-             download_file_from_url(url, weights_path)
-             if os.path.exists(weights_path):
-                 # Set weights_only=False to allow loading older pickles (std behavior in <2.6 but safer to be explicit)
-                 # Note: This is required for many research weights.
-                 try:
-                    state_dict = torch.load(weights_path, map_location=DEVICE, weights_only=False)
-                 except TypeError:
-                     # Fallback for older torch versions
-                     state_dict = torch.load(weights_path, map_location=DEVICE)
-                     
-                 self.model.load_state_dict(state_dict)
-             else:
-                 print(f"Warning: Failed to download weights to {weights_path}")
-        except Exception as e:
-             print(f"Error loading ArcFace weights: {e}")
-             
+            state_dict = torch.load(weights_path, map_location=DEVICE, weights_only=False)
+        except TypeError:
+            state_dict = torch.load(weights_path, map_location=DEVICE)
+
+        self.model.load_state_dict(state_dict)
         self.model.to(DEVICE)
         self.model.eval()
              

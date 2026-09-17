@@ -27,6 +27,28 @@ class SEModule(nn.Module):
         x = self.sigmoid(x)
         return module_input * x
 
+class bottleneck_IR(nn.Module):
+    def __init__(self, in_channel, depth, stride):
+        super(bottleneck_IR, self).__init__()
+        if in_channel == depth:
+            self.shortcut_layer = nn.MaxPool2d(1, stride)
+        else:
+            self.shortcut_layer = nn.Sequential(
+                nn.Conv2d(in_channel, depth, (1, 1), stride, bias=False),
+                nn.BatchNorm2d(depth),
+            )
+        self.res_layer = nn.Sequential(
+            nn.BatchNorm2d(in_channel),
+            nn.Conv2d(in_channel, depth, (3, 3), (1, 1), 1, bias=False),
+            nn.PReLU(depth),
+            nn.Conv2d(depth, depth, (3, 3), stride, 1, bias=False),
+            nn.BatchNorm2d(depth),
+        )
+
+    def forward(self, x):
+        return self.shortcut_layer(x) + self.res_layer(x)
+
+
 class bottleneck_IR_SE(nn.Module):
     def __init__(self, in_channel, depth, stride):
         super(bottleneck_IR_SE, self).__init__()

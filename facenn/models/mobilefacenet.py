@@ -81,21 +81,16 @@ class MobileFaceNetV2(FaceRecognitionModel):
         
     def load_model(self):
         self.model = MobileFaceNetV2Model(embedding_size=512)
-        
-        # Source: HuggingFace Mirror
         url = "https://huggingface.co/Anirban_Dhar/Face_Recognition/resolve/main/Model_Training/MobileFaceNet_Pytorch/weights/mobilefacenet.pth"
-        
         weights_path = Config.get_weights_path("MobileFaceNetV2", "mobilefacenet_v2.pth")
-        
-        try:
-             download_file_from_url(url, weights_path)
-             if os.path.exists(weights_path):
-                 state_dict = torch.load(weights_path, map_location=DEVICE, weights_only=False)
-                 self.model.load_state_dict(state_dict, strict=False)
-             else:
-                 print("Warning: Failed to download MobileFaceNet v2 weights.")
-        except Exception as e:
-             print(f"Error loading MobileFaceNet v2 weights: {e}")
+
+        if not os.path.exists(weights_path):
+            download_file_from_url(url, weights_path)
+
+        state_dict = torch.load(weights_path, map_location=DEVICE, weights_only=False)
+        self.model.load_state_dict(state_dict, strict=False)
+        self.model.to(DEVICE)
+        self.model.eval()
 
     def forward(self, x):
         return self.model(x)

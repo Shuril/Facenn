@@ -13,20 +13,13 @@ class FairFaceONNX(ONNXAnalyzer):
         self.age_labels = ['0-2', '3-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70+']
         
     def load_model(self):
-        # Source: https://github.com/yakhyo/fairface-onnx
         url = "https://github.com/yakhyo/fairface-onnx/releases/download/weights/fairface.onnx"
         weights_path = Config.get_weights_path("FairFace", "fairface.onnx")
-        
-        try:
-             download_file_from_url(url, weights_path)
-             if os.path.exists(weights_path):
-                 # Prefer CoreML on Mac if available? 
-                 # For now, stick to CPU/Default which is usually fast enough in ONNX
-                 self.session = ort.InferenceSession(weights_path, providers=self.providers)
-             else:
-                 print("Warning: Failed to download FairFace ONNX weights.")
-        except Exception as e:
-             print(f"Error loading FairFace ONNX: {e}")
+
+        if not os.path.exists(weights_path):
+            download_file_from_url(url, weights_path)
+
+        self.session = ort.InferenceSession(weights_path, providers=self.providers)
 
     def analyze(self, face_img: torch.Tensor):
         outputs = self.predict(face_img)

@@ -9,21 +9,14 @@ class EdgeFace(FaceRecognitionModel):
         super().__init__(model_name=model_name, input_shape=(112, 112))
         
     def load_model(self):
-        print(f"Loading {self.model_name} via torch.hub...")
-        # Redirect torch hub cache to project weights
-        hub_dir = os.path.join(Config.FACENN_HOME, "hub")
+        hub_dir = os.path.join(Config.ensure_facenn_home(), "hub")
         torch.hub.set_dir(hub_dir)
-        
         try:
-            # Load from official repo
-            self.model = torch.hub.load('otroshi/edgeface', self.model_name, source='github')
+            self.model = torch.hub.load("otroshi/edgeface", self.model_name, source="github")
             self.model.to(DEVICE)
             self.model.eval()
-        except Exception as e:
-            print(f"Error loading EdgeFace: {e}")
-            print("Trying fallback or check internet connection.")
-            # Fallback or re-raise
-            raise e
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load EdgeFace model '{self.model_name}': {exc}") from exc
 
     def forward(self, x):
         return self.model(x)

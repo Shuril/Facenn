@@ -1,17 +1,23 @@
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 import numpy as np
-from facenn.config import DEVICE
+
 
 class FaceDetector(ABC):
     def __init__(self, detector_name: str):
         self.detector_name = detector_name
-        self.model = None
 
     @abstractmethod
-    def detect_faces(self, img: np.ndarray):
+    def detect_faces(self, img: np.ndarray) -> List[Dict[str, Any]]:
         """
-        Detect faces in an image.
-        Returns: list of dicts with keys: 'box', 'confidence', 'keypoints'
-        box: [x, y, w, h]
+        Detects faces in a BGR image.
+
+        Returns:
+            List of dictionaries containing:
+                - 'box': [x, y, w, h] (integers)
+                - 'confidence': float (detection confidence)
+                - 'landmarks': Optional np.ndarray of shape (5, 2)
+                - 'keypoints': Optional dict with eye, nose, and mouth coordinates
         """
         pass
+

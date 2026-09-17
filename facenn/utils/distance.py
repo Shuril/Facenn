@@ -1,71 +1,112 @@
-import torch
+from typing import Union
 import numpy as np
-from numba import jit
+import torch
 
-def find_cosine_distance(source_representation, test_representation):
+
+def l2_normalize(x: Union[np.ndarray, torch.Tensor], axis: int = -1) -> Union[np.ndarray, torch.Tensor]:
+    """Normalizes vector or batch of vectors to unit length."""
+    if isinstance(x, torch.Tensor):
+        return torch.nn.functional.normalize(x, p=2, dim=axis)
+    norm = np.linalg.norm(x, axis=axis, keepdims=True)
+    norm = np.where(norm == 0, 1e-12, norm)
+    return x / norm
+
+
+def find_cosine_distance(
+    source_representation: Union[np.ndarray, torch.Tensor, list],
+    test_representation: Union[np.ndarray, torch.Tensor, list],
+) -> Union[float, np.ndarray, torch.Tensor]:
     """
-    Computes Cosine Distance using PyTorch for batch processing.
-    Args:
-        source_representation: Tensor or list
-        test_representation: Tensor or list
-    Returns:
-        float or Tensor: Cosine distance (1 - cosine_similarity)
+    Computes Cosine Distance (1 - cosine_similarity).
+    Supports NumPy arrays, PyTorch tensors, and 1D/2D batches.
     """
-    if not isinstance(source_representation, torch.Tensor):
-        source_representation = torch.tensor(source_representation)
-    if not isinstance(test_representation, torch.Tensor):
-        test_representation = torch.tensor(test_representation)
+    if isinstance(source_representation, torch.Tensor) and isinstance(test_representation, torch.Tensor):
+        if source_representation.device != test_representation.device:
+            test_representation = test_representation.to(source_representation.device)
 
-    # Ensure tensors are on the same device and float type
-    if source_representation.device != test_representation.device:
-       test_representation = test_representation.to(source_representation.device)
+        a = source_representation.float()
+        b = test_representation.float()
+        if a.ndim == 1:
+            a = a.unsqueeze(0)
+        if b.ndim == 1:
+            b = b.unsqueeze(0)
 
-    a = source_representation
-    b = test_representation
-    
-    if len(a.shape) == 1: a = a.unsqueeze(0)
-    if len(b.shape) == 1: b = b.unsqueeze(0)
+        a_norm = torch.nn.functional.normalize(a, p=2, dim=1)
+        b_norm = torch.nn.functional.normalize(b, p=2, dim=1)
+        sim = torch.mm(a_norm, b_norm.t())
+        dist = 1.0 - sim
 
-    # L2 Normalize
-    a_norm = torch.nn.functional.normalize(a, p=2, dim=1)
-    b_norm = torch.nn.functional.normalize(b, p=2, dim=1)
-    
-    # Cosine Similarity: dot product of normalized vectors
-    # If comparing one to many, use matmul
-    # a: (N, D), b: (M, D) -> (N, M)
-    sim = torch.mm(a_norm, b_norm.t())
-    dist = 1 - sim
-    
+        if dist.numel() == 1:
+            return float(dist.item())
+        return dist
+
+    # Fallback to NumPy
+    a = np.asarray(source_representation, dtype=np.float32)
+    b = np.asarray(test_representation, dtype=np.float32)
+
+    if a.ndim == 1:
+        a = a.reshape(1, -1)
+    if b.ndim == 1:
+        b = b.reshape(1, -1)
+
+    a_norm = a / np.maximum(np.linalg.norm(a, axis=1, keepdims=True), 1e-12)
+    b_norm = b / np.maximum(np.linalg.norm(b, axis=1, keepdims=True), 1e-12)
+
+    sim = np.dot(a_norm, b_norm.T)
+    dist = 1.0 - sim
+
+    if dist.size == 1:
+        return float(dist.item())
     return dist
 
-def find_euclidean_distance(source_representation, test_representation):
-    if not isinstance(source_representation, torch.Tensor):
-        source_representation = torch.tensor(source_representation)
-    if not isinstance(test_representation, torch.Tensor):
-        test_representation = torch.tensor(test_representation)
 
-    if source_representation.device != test_representation.device:
-       test_representation = test_representation.to(source_representation.device)
-       
-    return torch.pairwise_distance(source_representation, test_representation)
+def find_euclidean_distance(
+    source_representation: Union[np.ndarray, torch.Tensor, list],
+    test_representation: Union[np.ndarray, torch.Tensor, list],
+) -> Union[float, np.ndarray, torch.Tensor]:
+    """Computes Euclidean distance between representations."""
+    if isinstance(source_representation, torch.Tensor) and isinstance(test_representation, torch.Tensor):
+        if source_representation.device != test_representation.device:
+            test_representation = test_representation.to(source_representation.device)
+        a = source_representation.float()
+        b = test_representation.float()
+        if a.ndim == 1:
+            a = a.unsqueeze(0)
+        if b.ndim == 1:
+            b = b.unsqueeze(0)
+        dist = torch.cdist(a, b)
+        if dist.numel() == 1:
+            return float(dist.item())
+        return dist
 
-def l2_normalize(x):
-    if not isinstance(x, torch.Tensor):
-        x = torch.tensor(x)
-    return torch.nn.functional.normalize(x, p=2, dim=-1)
+    a = np.asarray(source_representation, dtype=np.float32)
+    b = np.asarray(test_representation, dtype=np.float32)
+    if a.ndim == 1:
+        a = a.reshape(1, -1)
+    if b.ndim == 1:
+        b = b.reshape(1, -1)
 
-# Numba optimized versions for CPU-heavy tasks or loop-based fallbacks
-@jit(nopython=True)
-def find_cosine_distance_cpu(a, b):
-    a = np.ascontiguousarray(a)
-    b = np.ascontiguousarray(b)
-    
-    dot = np.dot(a, b)
-    norm_a = np.linalg.norm(a)
-    norm_b = np.linalg.norm(b)
-    return 1 - (dot / (norm_a * norm_b))
+    # Broadcast difference
+    dist = np.linalg.norm(a[:, np.newaxis, :] - b[np.newaxis, :, :], axis=2)
+    if dist.size == 1:
+        return float(dist.item())
+    return dist
 
-@jit(nopython=True)
-def find_euclidean_distance_cpu(a, b):
-    return np.linalg.norm(a - b)
+
+def find_cosine_distance_cpu(a: np.ndarray, b: np.ndarray) -> float:
+    """Convenience CPU cosine distance between two 1D vectors."""
+    a = np.asarray(a, dtype=np.float32).ravel()
+    b = np.asarray(b, dtype=np.float32).ravel()
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
+    if denom == 0:
+        return 1.0
+    return float(1.0 - np.dot(a, b) / denom)
+
+
+def find_euclidean_distance_cpu(a: np.ndarray, b: np.ndarray) -> float:
+    """Convenience CPU euclidean distance between two 1D vectors."""
+    a = np.asarray(a, dtype=np.float32).ravel()
+    b = np.asarray(b, dtype=np.float32).ravel()
+    return float(np.linalg.norm(a - b))
+
 

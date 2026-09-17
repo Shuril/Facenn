@@ -31,17 +31,33 @@ env/
 /include
 /lib
 
-# Model Weights (excluded from git due to size limits)
+# Model Weights & Caches
 weights/
+.cache/
+*.pth
+*.pt
+*.onnx
 
-# Facenn
-.facenn/
+# Databases and temporary test artifacts
+*.pkl
 *.db
+*.sqlite
+*.sqlite3
+facenn_db.pkl
 tests/test.db
 tests/*.jpg
+tests/v_img*.jpg
 benchmark_output.txt
+*.tmp
 
-# Editor
+# Editor & OS
 .idea/
 .vscode/
 *.swp
+*.swo
+.DS_Store
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
