@@ -5,19 +5,25 @@ from facenn.config import Config
 from facenn.utils.io import download_file_from_url
 import os
 
+FAIRFACE_FILENAME = "fairface.onnx"
+FAIRFACE_URLS = [
+    Config.get_release_weights_url(FAIRFACE_FILENAME),
+    "https://github.com/yakhyo/fairface-onnx/releases/download/weights/fairface.onnx",
+]
+
+
 class FairFaceONNX(ONNXAnalyzer):
     def __init__(self):
         super().__init__(model_name="FairFace-ONNX", input_shape=(224, 224))
         self.race_labels = ['White', 'Black', 'Latino_Hispanic', 'East Asian', 'Southeast Asian', 'Indian', 'Middle Eastern']
         self.gender_labels = ['Male', 'Female']
         self.age_labels = ['0-2', '3-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70+']
-        
+
     def load_model(self):
-        url = "https://github.com/yakhyo/fairface-onnx/releases/download/weights/fairface.onnx"
-        weights_path = Config.get_weights_path("FairFace", "fairface.onnx")
+        weights_path = Config.get_weights_path("FairFace", FAIRFACE_FILENAME)
 
         if not os.path.exists(weights_path):
-            download_file_from_url(url, weights_path)
+            download_file_from_url(FAIRFACE_URLS, weights_path)
 
         self.session = ort.InferenceSession(weights_path, providers=self.providers)
 

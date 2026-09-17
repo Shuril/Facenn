@@ -14,7 +14,8 @@ from facenn.models.arcface import ArcFace
 from facenn.models.buffalo_l import Buffalo_L
 from facenn.models.edgeface import EdgeFace
 from facenn.models.facenet import FaceNet
-from facenn.models.mobilefacenet import MobileFaceNetV2
+from facenn.models.mobilefacenet import MobileFaceNet, MobileFaceNetV2
+from facenn.models.sface import SFace
 from facenn.models.vggface import VGGFace
 from facenn.utils.distance import find_cosine_distance
 from facenn.utils.image import crop_and_align_face, load_image
@@ -30,8 +31,9 @@ class Facenn:
     RECOGNITION_MODELS = {
         "ArcFace": ArcFace,
         "FaceNet": FaceNet,
-        "MobileFaceNet": MobileFaceNetV2,
+        "MobileFaceNet": MobileFaceNet,
         "MobileFaceNet v2": MobileFaceNetV2,
+        "SFace": SFace,
         "EdgeFace": EdgeFace,
         "Buffalo_L": Buffalo_L,
         "VGG-Face": VGGFace,

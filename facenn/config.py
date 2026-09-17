@@ -8,7 +8,16 @@ logger.addHandler(logging.NullHandler())
 
 class Config:
     FACENN_HOME = os.getenv("FACENN_HOME", os.path.expanduser("~/.cache/facenn"))
+    FACENN_RELEASE_URL = os.getenv(
+        "FACENN_RELEASE_URL",
+        "https://github.com/Shuril/Facenn/releases/download/v0.2.0/",
+    )
     USE_OPENVINO = os.getenv("FACENN_USE_OPENVINO", "0") == "1"
+
+    @staticmethod
+    def get_release_weights_url(filename: str) -> str:
+        base = Config.FACENN_RELEASE_URL.rstrip("/")
+        return f"{base}/{filename}"
 
     @staticmethod
     def get_device(preference=None):

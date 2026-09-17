@@ -10,10 +10,11 @@ from facenn.utils.io import download_file_from_url
 
 logger = logging.getLogger("facenn")
 
-YUNET_MODEL_URL = (
-    "https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/"
-    "face_detection_yunet_2023mar.onnx"
-)
+YUNET_FILENAME = "face_detection_yunet_2023mar.onnx"
+YUNET_MODEL_URLS = [
+    Config.get_release_weights_url(YUNET_FILENAME),
+    "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+]
 
 
 class YuNetWrapper(FaceDetector):
@@ -35,9 +36,9 @@ class YuNetWrapper(FaceDetector):
         if self.net is not None:
             return
 
-        weights_path = self.model_path or Config.get_weights_path("YuNet", "face_detection_yunet_2023mar.onnx")
+        weights_path = self.model_path or Config.get_weights_path("YuNet", YUNET_FILENAME)
         if not os.path.exists(weights_path):
-            download_file_from_url(YUNET_MODEL_URL, weights_path)
+            download_file_from_url(YUNET_MODEL_URLS, weights_path)
 
         self.net = cv2.FaceDetectorYN.create(
             model=weights_path,

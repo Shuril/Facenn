@@ -71,16 +71,20 @@ print(matches)
 
 ## Model Reference
 
-| Category | Model | Backbone | Input Resolution | Backend |
+Pretrained weights are hosted on [GitHub Releases](https://github.com/Shuril/Facenn/releases) and downloaded automatically on first use.
+
+| Category | Model | Backbone / Framework | Input Resolution | Embedding / Task |
 | :--- | :--- | :--- | :--- | :--- |
-| **Detection** | YuNet (Default) | CNN | Dynamic | OpenCV DNN / ONNX |
-| **Detection** | RetinaFace | ResNet-50 | Dynamic | PyTorch |
-| **Detection** | Haar Cascade | Cascade | Dynamic | OpenCV |
-| **Recognition** | ArcFace (Default) | IR-SE-50 | 112x112 | PyTorch / ONNX |
-| **Recognition** | EdgeFace | MobileViT | 112x112 | PyTorch |
-| **Recognition** | MobileFaceNet | MobileNetV2 | 112x112 | PyTorch / ONNX |
-| **Analysis** | FairFace | ResNet-34 | 224x224 | ONNX / PyTorch |
-| **Analysis** | HSEmotion | EfficientNet-B0 | 224x224 | ONNX / PyTorch |
+| **Detection** | YuNet (Default) | OpenCV DNN | Dynamic | 5 Landmarks |
+| **Detection** | RetinaFace | PyTorch ResNet-50 | Dynamic | 5 Landmarks |
+| **Detection** | Haar Cascade | OpenCV Cascade | Dynamic | Bounding Box |
+| **Recognition** | ArcFace (Default) | PyTorch IR-SE-50 | 112x112 | 512-dim embedding |
+| **Recognition** | SFace | OpenCV DNN ONNX | 112x112 | 128-dim embedding |
+| **Recognition** | MobileFaceNet | ONNX Runtime | 112x112 | 512-dim embedding |
+| **Recognition** | EdgeFace | PyTorch Hub | 112x112 | 512-dim embedding |
+| **Recognition** | FaceNet | PyTorch Inception-ResNet | 160x160 | 512-dim embedding |
+| **Analysis** | FairFace | ONNX Runtime | 224x224 | Age, Gender, Race |
+| **Analysis** | HSEmotion | ONNX Runtime | 224x224 | 8 Emotions |
 
 ## Configuration
 

@@ -188,37 +188,29 @@ class InceptionResnetV1(nn.Module):
             return self.logits(x)
         return x
 
+FACENET_FILENAME = "facenet_vggface2.pt"
+FACENET_URLS = [
+    Config.get_release_weights_url(FACENET_FILENAME),
+    "https://github.com/timesler/facenet-pytorch/releases/download/v2.2.9/20180402-114759-vggface2.pt",
+]
+
+
 class FaceNet(FaceRecognitionModel):
     def __init__(self):
-        super().__init__(model_name="FaceNet", input_shape=(160, 160)) # FaceNet expects 160x160 usually
-        
+        super().__init__(model_name="FaceNet", input_shape=(160, 160))
+
     def load_model(self):
         self.model = InceptionResnetV1(classify=False)
-        
-        # Download CASIA-WebFace weights from facenet-pytorch compatible source
-        # Source: https://github.com/timesler/facenet-pytorch
-        # We need the state dict. 
-        # Using a reliable mirror or the official one if possible. 
-        # timesler hosts them on drive, which is hard. 
-        # But deepface hosts converted weights too.
-        # Let's use the one from `deepface_models` but it's .h5 (Keras).
-        # We need PyTorch weights.
-        # Let's use `vggface2` or `casia-webface` weights from a known repo.
-        
-        # Using: https://github.com/timesler/facenet-pytorch/releases/download/v2.2.9/20180402-114759-vggface2.pt
-        url = "https://github.com/timesler/facenet-pytorch/releases/download/v2.2.9/20180402-114759-vggface2.pt"
-        
-        weights_path = Config.get_weights_path("FaceNet", "facenet_vggface2.pt")
-        
-        try:
-             download_file_from_url(url, weights_path)
-             if os.path.exists(weights_path):
-                 state_dict = torch.load(weights_path, map_location=DEVICE)
-                 self.model.load_state_dict(state_dict, strict=False)
-             else:
-                 print("Warning: Failed to download FaceNet weights.")
-        except Exception as e:
-             print(f"Error loading FaceNet weights: {e}")
+        weights_path = Config.get_weights_path("FaceNet", FACENET_FILENAME)
+
+        if not os.path.exists(weights_path):
+            download_file_from_url(FACENET_URLS, weights_path)
+
+        state_dict = torch.load(weights_path, map_location=DEVICE)
+        self.model.load_state_dict(state_dict, strict=False)
+        self.model.to(DEVICE)
+        self.model.eval()
 
     def forward(self, x):
         return self.model(x)
+

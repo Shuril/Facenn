@@ -12,7 +12,11 @@ from facenn.detectors.base import FaceDetector
 from facenn.models.retinaface import RetinaFace
 from facenn.utils.io import download_file_from_url
 
-RETINAFACE_URL = "https://huggingface.co/akhaliq/RetinaFace-R50/resolve/main/RetinaFace-R50.pth"
+RETINAFACE_FILENAME = "retinaface_r50.pth"
+RETINAFACE_URLS = [
+    Config.get_release_weights_url(RETINAFACE_FILENAME),
+    "https://huggingface.co/akhaliq/RetinaFace-R50/resolve/main/RetinaFace-R50.pth",
+]
 
 
 def _generate_priors(image_size: tuple, steps=(8, 16, 32), min_sizes=((16, 32), (64, 128), (256, 512))) -> torch.Tensor:
@@ -65,12 +69,14 @@ class RetinaFaceWrapper(FaceDetector):
             return
 
         self.net = RetinaFace(phase="test").to(DEVICE)
-        weights_path = Config.get_weights_path("RetinaFace", "Resnet50_Final.pth")
+        weights_path = Config.get_weights_path("RetinaFace", RETINAFACE_FILENAME)
+        legacy_weights_path = Config.get_weights_path("RetinaFace", "Resnet50_Final.pth")
 
-        if not os.path.exists(weights_path):
-            download_file_from_url(RETINAFACE_URL, weights_path)
+        target_path = legacy_weights_path if os.path.exists(legacy_weights_path) else weights_path
+        if not os.path.exists(target_path):
+            download_file_from_url(RETINAFACE_URLS, target_path)
 
-        checkpoint = torch.load(weights_path, map_location=DEVICE, weights_only=False)
+        checkpoint = torch.load(target_path, map_location=DEVICE, weights_only=False)
         state_dict = checkpoint.get("state_dict", checkpoint)
         # Strip potential 'module.' prefix from DataParallel training
         cleaned_state = {k.replace("module.", ""): v for k, v in state_dict.items()}
